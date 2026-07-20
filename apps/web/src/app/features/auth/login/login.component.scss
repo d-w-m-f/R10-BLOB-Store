@@ -1,0 +1,145 @@
+.login-wrapper {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--color-white) 0%, var(--color-light-cyan) 100%);
+  overflow: hidden;
+}
+
+.background-decorations {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  overflow: hidden;
+
+  .circle {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.6;
+    animation: float 10s infinite ease-in-out alternate;
+  }
+
+  .circle-1 {
+    width: 400px;
+    height: 400px;
+    background: var(--color-turquoise);
+    top: -100px;
+    left: -100px;
+  }
+
+  .circle-2 {
+    width: 300px;
+    height: 300px;
+    background: var(--color-dark-blue);
+    bottom: -50px;
+    right: -50px;
+    animation-delay: -5s;
+  }
+}
+
+.login-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  padding: 2.5rem;
+  margin: 1rem;
+  animation: slideUp var(--transition-normal);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+
+  .icon-logo {
+    font-size: 3rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    color: var(--text-primary);
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    opacity: 0.8;
+  }
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.input-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .icon-left {
+    position: absolute;
+    left: 1rem;
+    color: var(--color-dark-blue);
+    font-size: 1.25rem;
+    opacity: 0.6;
+  }
+
+  .input-control {
+    width: 100%;
+    padding-left: 3rem; /* Espaço para o ícone */
+  }
+}
+
+.error-msg {
+  color: #e63946;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.login-btn {
+  margin-top: 1rem;
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.05rem;
+
+  .loader {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top-color: var(--color-very-dark-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(-30px) scale(1.05); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,130 @@
+/* Global Styles */
+:root {
+  /* Cores requisitadas pelo usuário */
+  --color-white: #ffffff;
+  --color-light-cyan: #e0ffff;
+  --color-turquoise: #40e0d0;
+  --color-dark-blue: #1c2541;
+  --color-very-dark-blue: #0b132b;
+  --color-black: #000000;
+  
+  /* Sistema de variáveis semânticas */
+  --bg-main: var(--color-white);
+  --bg-secondary: var(--color-light-cyan);
+  --text-primary: var(--color-very-dark-blue);
+  --text-secondary: var(--color-black);
+  
+  --primary: var(--color-turquoise);
+  --primary-hover: #35c4b5; /* Turquesa um pouco mais escuro */
+  --accent: var(--color-dark-blue);
+  
+  --shadow-sm: 0 4px 6px -1px rgba(11, 19, 43, 0.1), 0 2px 4px -1px rgba(11, 19, 43, 0.06);
+  --shadow-md: 0 10px 15px -3px rgba(11, 19, 43, 0.1), 0 4px 6px -2px rgba(11, 19, 43, 0.05);
+  --shadow-lg: 0 20px 25px -5px rgba(11, 19, 43, 0.1), 0 10px 10px -5px rgba(11, 19, 43, 0.04);
+  
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-full: 9999px;
+  
+  --font-family: 'Inter', sans-serif;
+  
+  /* Transições suaves */
+  --transition-fast: 150ms ease-in-out;
+  --transition-normal: 250ms ease-in-out;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Glassmorphism e utilitários modernos */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-lg);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: var(--color-very-dark-blue);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-accent {
+  background-color: var(--accent);
+  color: var(--color-white);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-accent:hover {
+  background-color: #27345b; /* Azul escuro mais claro no hover */
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Inputs globais */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.input-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.input-control {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid #cbd5e1;
+  background-color: var(--color-white);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 1rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input-control:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(64, 224, 208, 0.3); /* Ring turquesa */
+}
