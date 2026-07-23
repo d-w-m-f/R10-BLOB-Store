@@ -29,6 +29,11 @@ func SetupRouter() *gin.Engine {
 
 	v1 := r.Group("/api/v1")
 	{
+		files := v1.Group("/files")
+		{
+			files.DELETE("/:blob_id", controllers.DeleteFile)
+		}
+
 		uploads := v1.Group("/uploads")
 		{
 			uploads.POST("/init", controllers.InitUpload)
