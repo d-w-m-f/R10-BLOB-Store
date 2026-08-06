@@ -1,0 +1,35 @@
+<div class="card glass">
+  <h2>Cluster Overview</h2>
+
+  <div class="stats-grid" *ngIf="stats">
+    <div class="stat-box">
+      <div class="stat-icon">💻</div>
+      <div class="stat-info">
+        <span class="label">Total Daemons</span>
+        <span class="value">{{ stats.workers }}</span>
+      </div>
+    </div>
+    
+    <div class="stat-box">
+      <div class="stat-icon">🖨️</div>
+      <div class="stat-info">
+        <span class="label">Managed Machines</span>
+        <span class="value">{{ stats.machines }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="capacity-section" *ngIf="stats">
+    <div class="capacity-header">
+      <span class="label">Total Capacity</span>
+      <span class="value">{{ stats.used_mb }} MB / {{ stats.capacity_mb }} MB</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" [style.width.%]="getCapacityPercentage()"></div>
+    </div>
+  </div>
+
+  <div class="empty-state" *ngIf="!stats || stats.workers === 0">
+    <p>Cluster is completely empty. Run Bootstrap to provision.</p>
+  </div>
+</div>
