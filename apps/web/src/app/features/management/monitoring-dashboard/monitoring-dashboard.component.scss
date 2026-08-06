@@ -1,0 +1,73 @@
+.card.glass {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: #e2e8f0;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-box {
+  background: rgba(15, 23, 42, 0.5);
+  padding: 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  .stat-icon {
+    font-size: 2rem;
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+    
+    .label { font-size: 0.875rem; color: #94a3b8; }
+    .value { font-size: 1.5rem; font-weight: 700; color: #fff; }
+  }
+}
+
+.capacity-section {
+  .capacity-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    .label { color: #94a3b8; font-size: 0.875rem; }
+    .value { color: #e2e8f0; font-weight: 600; }
+  }
+
+  .progress-bar {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+      transition: width 0.5s ease-out;
+    }
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem 0;
+  color: #94a3b8;
+  font-style: italic;
+}

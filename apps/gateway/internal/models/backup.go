@@ -14,3 +14,9 @@ type Backup struct {
 	CreatedAt            time.Time `json:"backup_created_at"`
 	UpdatedAt            time.Time `json:"backup_updated_at"`
 }
+
+// TableName overrides the default table name to specify the DDD schema namespace.
+func (Backup) TableName() string {
+	return "control_plane.backups"
+}
+

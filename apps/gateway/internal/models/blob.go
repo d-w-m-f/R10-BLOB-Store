@@ -30,3 +30,9 @@ type Blob struct {
 	Memblock32 *Memblock32 `gorm:"foreignKey:Memblock32ID" json:"memblock32,omitempty"`
 	BlobChunks []BlobChunk `gorm:"foreignKey:BlobID" json:"blob_chunks,omitempty"`
 }
+
+// TableName overrides the default table name to specify the DDD schema namespace.
+func (Blob) TableName() string {
+	return "storage.blobs"
+}
+

@@ -7,9 +7,10 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func SetupRouter() *gin.Engine {
+func SetupRouter(db *gorm.DB) *gin.Engine {
 	r := gin.Default()
 
 	// CORS config (allow frontend to connect)
@@ -39,6 +40,16 @@ func SetupRouter() *gin.Engine {
 			uploads.POST("/init", controllers.InitUpload)
 			uploads.PUT("/:upload_id/parts/:part_number", controllers.UploadPart)
 			uploads.POST("/:upload_id/complete", controllers.CompleteUpload)
+		}
+
+		mgtCtrl := controllers.NewManagementController(db)
+		management := v1.Group("/management")
+		{
+			management.GET("/cluster", mgtCtrl.GetClusterStats)
+			management.GET("/workers", mgtCtrl.GetWorkers)
+			management.POST("/bootstrap", mgtCtrl.BootstrapCluster)
+			management.POST("/reset", mgtCtrl.ResetCluster)
+			management.GET("/jobs/:job_id", mgtCtrl.GetJobStatus)
 		}
 	}
 

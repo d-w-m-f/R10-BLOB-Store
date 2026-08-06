@@ -1,5 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { UploadService } from '../../../core/services/upload.service';
 
 @Component({
   selector: 'app-upload',
@@ -47,6 +48,8 @@ import { CommonModule } from '@angular/common';
   styleUrls: ['./upload.component.scss']
 })
 export class UploadComponent {
+  private uploadService = inject(UploadService);
+
   isDragging = signal<boolean>(false);
   uploadingFiles = signal<{name: string, progress: number}[]>([]);
 
@@ -81,24 +84,26 @@ export class UploadComponent {
     const newFiles = files.map(f => ({ name: f.name, progress: 0 }));
     this.uploadingFiles.update(current => [...current, ...newFiles]);
 
-    // Simula o upload progredindo
-    newFiles.forEach((file, index) => {
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += Math.floor(Math.random() * 20) + 10;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(interval);
-          // Opcional: remover da lista ao terminar e adicionar na store real
-        }
-        
+    // Inicia o upload real para cada arquivo
+    files.forEach(file => {
+      this.uploadService.uploadFile(file, (progress: number) => {
+        // Callback que é chamado a cada Chunk enviado
         this.uploadingFiles.update(current => {
           const updated = [...current];
           const fileToUpdate = updated.find(f => f.name === file.name);
           if (fileToUpdate) fileToUpdate.progress = progress;
           return updated;
         });
-      }, 500 + Math.random() * 500); // tempo aleatório para cada arquivo
+      }).subscribe({
+        next: (res) => {
+          console.log(`Upload concluído para: ${file.name}`, res);
+          // Opcional: remover da lista ao terminar ou dar feedback visual de sucesso
+        },
+        error: (err) => {
+          console.error(`Falha no upload do arquivo ${file.name}`, err);
+          // Opcional: Marcar barra de progresso como vermelha
+        }
+      });
     });
   }
 }

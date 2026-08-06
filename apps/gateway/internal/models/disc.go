@@ -24,3 +24,9 @@ type Disc struct {
 	Machine     *Machine     `gorm:"foreignKey:MachineID" json:"machine,omitempty"`
 	BlobChunks  []BlobChunk  `gorm:"foreignKey:DiscID" json:"blob_chunks,omitempty"`
 }
+
+// TableName overrides the default table name to specify the DDD schema namespace.
+func (Disc) TableName() string {
+	return "infra.discs"
+}
+

@@ -24,6 +24,10 @@ export const routes: Routes = [
       {
         path: 'upload',
         loadComponent: () => import('./features/files/upload/upload.component').then(m => m.UploadComponent)
+      },
+      {
+        path: 'management',
+        loadComponent: () => import('./features/management/management-page/management-page.component').then(m => m.ManagementPageComponent)
       }
     ]
   },

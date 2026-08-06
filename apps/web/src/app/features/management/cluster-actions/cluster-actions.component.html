@@ -1,0 +1,51 @@
+<div class="card">
+  <h2>Cluster Actions</h2>
+  
+  <div class="action-buttons">
+    <button class="btn btn-primary" (click)="openModal('bootstrap')">
+      <span class="icon">🚀</span> Bootstrap Cluster
+    </button>
+    <button class="btn btn-danger" (click)="openModal('reset')">
+      <span class="icon">⚠️</span> Reset Cluster
+    </button>
+  </div>
+</div>
+
+<!-- Modal Overlay -->
+<div class="modal-overlay" *ngIf="showModal">
+  <div class="modal-content glass">
+    <ng-container *ngIf="!jobStatus">
+      <h3>Are you absolutely sure?</h3>
+      <p class="warning-text">
+        This action will <strong>{{ modalAction === 'bootstrap' ? 'CREATE' : 'DESTROY' }}</strong> the entire cluster topology.
+        <br>
+        {{ modalAction === 'bootstrap' ? 'This creates 4 Workers and 38 Machines.' : 'All logical data and directories will be wiped.' }}
+      </p>
+      
+      <div class="modal-actions">
+        <button class="btn btn-secondary" (click)="closeModal()">Cancel</button>
+        <button 
+          class="btn" 
+          [class.btn-primary]="modalAction === 'bootstrap'"
+          [class.btn-danger]="modalAction === 'reset'"
+          (click)="confirmAction()">
+          Confirm {{ modalAction | titlecase }}
+        </button>
+      </div>
+    </ng-container>
+
+    <!-- Job Status Loading State -->
+    <ng-container *ngIf="jobStatus">
+      <div class="job-status" [ngClass]="jobStatus.job_status">
+        <div class="spinner" *ngIf="jobStatus.job_status === 'running' || jobStatus.job_status === 'pending'"></div>
+        
+        <h3>{{ jobStatus.job_status | uppercase }}</h3>
+        
+        <p *ngIf="jobStatus.job_status === 'success'">Operation completed successfully!</p>
+        <p *ngIf="jobStatus.job_status === 'failed'" class="error-msg">{{ jobStatus.job_error }}</p>
+        
+        <button class="btn btn-secondary" *ngIf="jobStatus.job_status === 'failed'" (click)="closeModal()">Close</button>
+      </div>
+    </ng-container>
+  </div>
+</div>

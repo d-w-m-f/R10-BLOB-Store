@@ -1,0 +1,17 @@
+<div class="management-container">
+  <header class="management-header">
+    <h1>Cluster Control Plane</h1>
+    <p>Manage and monitor your R10 Blob Store topology.</p>
+  </header>
+
+  <div class="management-grid">
+    <div class="left-column">
+      <app-cluster-actions (clusterChanged)="onClusterChanged()"></app-cluster-actions>
+      <app-monitoring-dashboard [refresh]="refreshTrigger"></app-monitoring-dashboard>
+    </div>
+    
+    <div class="right-column">
+      <app-daemon-visibility [refresh]="refreshTrigger"></app-daemon-visibility>
+    </div>
+  </div>
+</div>

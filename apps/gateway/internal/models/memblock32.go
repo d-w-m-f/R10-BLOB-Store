@@ -28,3 +28,9 @@ type Memblock32 struct {
 	// Blobs that are temporarily stored inside this block before encoding
 	Blobs []Blob `gorm:"foreignKey:Memblock32ID" json:"blobs,omitempty"`
 }
+
+// TableName overrides the default table name to specify the DDD schema namespace.
+func (Memblock32) TableName() string {
+	return "storage.memblock32"
+}
+

@@ -19,3 +19,9 @@ type User struct {
 	// Relationships
 	Blobs []Blob `gorm:"foreignKey:OwnerID" json:"blobs,omitempty"`
 }
+
+// TableName overrides the default table name to specify the DDD schema namespace.
+func (User) TableName() string {
+	return "storage.users"
+}
+

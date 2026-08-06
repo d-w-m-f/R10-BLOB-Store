@@ -42,8 +42,13 @@ func migrate() {
 
 	fmt.Println("Database connection established. Starting migrations...")
 
-	// Enable uuid-ossp extension in case gen_random_uuid() requires it (though in PG 13+ it's built-in)
+	// Enable uuid-ossp extension in case gen_random_uuid() requires it
 	db.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";")
+
+	// Provision DDD Bounded Context Schemas
+	db.Exec("CREATE SCHEMA IF NOT EXISTS infra;")
+	db.Exec("CREATE SCHEMA IF NOT EXISTS storage;")
+	db.Exec("CREATE SCHEMA IF NOT EXISTS control_plane;")
 
 	// Run AutoMigrate for all defined models
 	err = db.AutoMigrate(
@@ -55,6 +60,7 @@ func migrate() {
 		&models.Blob{},
 		&models.BlobChunk{},
 		&models.Backup{},
+		&models.Job{},
 	)
 
 	if err != nil {

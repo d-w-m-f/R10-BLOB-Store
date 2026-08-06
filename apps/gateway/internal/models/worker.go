@@ -21,12 +21,17 @@ type Worker struct {
 	CapacityMB int64          `gorm:"not null" json:"worker_capacity_mb"`
 	UsedMB     int64          `gorm:"not null;default:0" json:"worker_used_mb"`
 	Status     WorkerStatus   `gorm:"type:varchar(50);not null;default:'active'" json:"worker_status"`
-	MachineID  uuid.UUID      `gorm:"type:uuid;not null;index" json:"worker_machine_id"`
 	CreatedAt  time.Time      `json:"worker_created_at"`
 	UpdatedAt  time.Time      `json:"worker_updated_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relationships
-	Machine    *Machine    `gorm:"foreignKey:MachineID" json:"machine,omitempty"`
+	Machines   []Machine   `gorm:"foreignKey:WorkerID" json:"machines,omitempty"`
 	BlobChunks []BlobChunk `gorm:"foreignKey:WorkerID" json:"blob_chunks,omitempty"`
 }
+
+// TableName overrides the default table name to specify the DDD schema namespace.
+func (Worker) TableName() string {
+	return "infra.workers"
+}
+

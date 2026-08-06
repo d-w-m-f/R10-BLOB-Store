@@ -14,5 +14,14 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
+  # gateway:
+  #   build: ./apps/gateway
+  #   container_name: r10_gateway
+  #   ports:
+  #     - "8080:8080"
+  #   volumes:
+  #     - gateway_staging:/tmp/r10_uploads # Volume ultrarrápido (preferencialmente SSD) para Staging/Tmp
+
 volumes:
   pgdata:
+  gateway_staging:

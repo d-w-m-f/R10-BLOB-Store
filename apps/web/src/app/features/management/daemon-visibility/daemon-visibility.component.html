@@ -1,0 +1,33 @@
+<div class="card glass">
+  <h2>Daemon Visibility</h2>
+
+  <div class="workers-list" *ngIf="workers.length > 0; else emptyState">
+    <div class="worker-item" *ngFor="let worker of workers">
+      
+      <div class="worker-header">
+        <div class="worker-name-group">
+          <span class="status-indicator" [class.active]="worker.worker_status === 'active'"></span>
+          <h3>{{ worker.worker_name }}</h3>
+        </div>
+        <div class="worker-stats">
+          <span class="badge">{{ worker.machines?.length || 0 }} Machines</span>
+          <span class="capacity">{{ worker.worker_capacity_mb }} MB Cap</span>
+        </div>
+      </div>
+
+      <div class="machines-grid">
+        <div class="machine-pill" *ngFor="let machine of worker.machines">
+          <span class="type-icon">{{ machine.machine_type === 'block' ? '📦' : '⚡' }}</span>
+          <span class="machine-name">{{ machine.machine_name }}</span>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <ng-template #emptyState>
+    <div class="empty-state">
+      <p>No Daemons provisioned yet.</p>
+    </div>
+  </ng-template>
+</div>
