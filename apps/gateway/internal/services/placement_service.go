@@ -2,15 +2,27 @@ package services
 
 import (
 	"errors"
-	"math/rand"
-	"time"
+	"fmt"
+	"math/rand/v2"
 
 	"gateway/internal/models"
 
 	"gorm.io/gorm"
 )
 
-// PlacementService encapsulates the heuristics for selecting workers
+// Target is a resolved placement destination: one logical machine, the disc that
+// backs it and the daemon that serves it.
+type Target struct {
+	MachineID   string `gorm:"column:machine_id"`
+	Namespace   string `gorm:"column:namespace"`
+	MachineType string `gorm:"column:machine_type"`
+	DiscID      string `gorm:"column:disc_id"`
+	WorkerID    string `gorm:"column:worker_id"`
+	WorkerAddr  string `gorm:"column:worker_addr"`
+	FreeMB      int64  `gorm:"column:free_mb"`
+}
+
+// PlacementService encapsulates the heuristics for selecting storage targets.
 type PlacementService struct {
 	db *gorm.DB
 }
@@ -19,56 +31,72 @@ func NewPlacementService(db *gorm.DB) *PlacementService {
 	return &PlacementService{db: db}
 }
 
-// SelectWorkersForEC returns exactly 12 distinct workers for Erasure Coding (8+4).
-// Heuristic:
-// 1. Get Top 16 Block Workers by Free Space (CapacityMB - UsedMB).
-// 2. Take the absolute Top 6.
-// 3. From the remaining 10, pick 6 randomly.
-func (ps *PlacementService) SelectWorkersForEC(requiredMB int64) ([]models.Worker, error) {
-	var candidates []models.Worker
-
-	// 1. Filter: Active Workers on Block Machines with enough space
-	// Order by free space descending. Limit 16.
-	err := ps.db.
-		Joins("JOIN machines ON machines.id = workers.machine_id").
+// candidates lists every active machine of the given type with at least requiredMB
+// of free space on its disc, ordered by free space descending.
+//
+// Placement is per MACHINE, not per worker: a wkr10 daemon multiplexes many logical
+// machines, so the cluster has only 4 workers but 38 machines. The previous version
+// joined `machines.id = workers.machine_id` (a column that does not exist) and asked
+// for 12 distinct workers, so every placement failed.
+func (ps *PlacementService) candidates(machineType models.MachineType, requiredMB int64) ([]Target, error) {
+	var out []Target
+	err := ps.db.Model(&models.Machine{}).
+		Select(`machines.id AS machine_id,
+		        machines.namespace AS namespace,
+		        machines.type AS machine_type,
+		        discs.id AS disc_id,
+		        workers.id AS worker_id,
+		        workers.address AS worker_addr,
+		        (discs.capacity_mb - discs.used_mb) AS free_mb`).
+		Joins("JOIN infra.discs discs ON discs.machine_id = machines.id").
+		Joins("JOIN infra.workers workers ON workers.id = machines.worker_id").
+		Where("machines.deleted_at IS NULL").
+		Where("workers.deleted_at IS NULL").
 		Where("workers.status = ?", models.WorkerStatusActive).
-		Where("machines.type = ?", models.MachineTypeBlock).
-		Where("(workers.capacity_mb - workers.used_mb) >= ?", requiredMB).
-		Order("(workers.capacity_mb - workers.used_mb) DESC").
-		Limit(16).
-		Find(&candidates).Error
-
+		Where("discs.status = ?", models.DiscStatusActive).
+		Where("machines.type = ?", machineType).
+		Where("(discs.capacity_mb - discs.used_mb) >= ?", requiredMB).
+		Order("(discs.capacity_mb - discs.used_mb) DESC").
+		Scan(&out).Error
 	if err != nil {
 		return nil, err
 	}
+	return out, nil
+}
 
-	if len(candidates) < 12 {
-		return nil, errors.New("not enough eligible workers for 8+4 placement")
+// SelectMachinesForEC returns exactly `count` DISTINCT block machines for one
+// erasure-coded stripe. Heuristic: take the emptiest half deterministically, then
+// pick the rest at random from the tail so uploads do not all pile onto the same
+// machines.
+func (ps *PlacementService) SelectMachinesForEC(count int, requiredMB int64) ([]Target, error) {
+	candidates, err := ps.candidates(models.MachineTypeBlock, requiredMB)
+	if err != nil {
+		return nil, err
 	}
-
-	var selected []models.Worker
-
-	// If we got exactly 12, just return them
-	if len(candidates) == 12 {
+	if len(candidates) < count {
+		return nil, fmt.Errorf("not enough eligible block machines for placement: need %d, have %d (is the cluster bootstrapped?)", count, len(candidates))
+	}
+	if len(candidates) == count {
 		return candidates, nil
 	}
 
-	// 3. Deterministic selection: Top 6
-	selected = append(selected, candidates[:6]...)
+	head := count / 2
+	selected := append([]Target{}, candidates[:head]...)
 
-	// 4. Random selection: 6 out of the remaining
-	remaining := candidates[6:]
+	tail := append([]Target{}, candidates[head:]...)
+	rand.Shuffle(len(tail), func(i, j int) { tail[i], tail[j] = tail[j], tail[i] })
 
-	// Create a new random generator
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	
-	// Shuffle the remaining slice
-	r.Shuffle(len(remaining), func(i, j int) {
-		remaining[i], remaining[j] = remaining[j], remaining[i]
-	})
+	return append(selected, tail[:count-head]...), nil
+}
 
-	// Pick first 6 from shuffled
-	selected = append(selected, remaining[:6]...)
-
-	return selected, nil
+// SelectMachine returns the single emptiest machine of the given type.
+func (ps *PlacementService) SelectMachine(machineType models.MachineType, requiredMB int64) (Target, error) {
+	candidates, err := ps.candidates(machineType, requiredMB)
+	if err != nil {
+		return Target{}, err
+	}
+	if len(candidates) == 0 {
+		return Target{}, errors.New("no eligible " + string(machineType) + " machine with enough free space (is the cluster bootstrapped?)")
+	}
+	return candidates[0], nil
 }
