@@ -18,6 +18,8 @@ const (
 type Machine struct {
 	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"machine_uuid"`
 	Name      string         `gorm:"type:varchar(255);not null" json:"machine_name"`
+	// Namespace is the 8-char id used to address this machine on its wkr10 daemon.
+	Namespace string         `gorm:"type:varchar(64);not null;default:'';uniqueIndex" json:"machine_namespace"`
 	Type      MachineType    `gorm:"type:varchar(50);not null;default:'block'" json:"machine_type"`
 	WorkerID  uuid.UUID      `gorm:"type:uuid;not null;index" json:"machine_worker_id"`
 	CreatedAt time.Time      `json:"machine_created_at"`
