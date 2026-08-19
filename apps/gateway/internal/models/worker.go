@@ -22,6 +22,7 @@ type Worker struct {
 	Address    string         `gorm:"type:varchar(255);not null;default:''" json:"worker_address"`
 	CapacityMB int64          `gorm:"not null" json:"worker_capacity_mb"`
 	UsedMB     int64          `gorm:"not null;default:0" json:"worker_used_mb"`
+	UsedBytes  int64          `gorm:"not null;default:0" json:"worker_used_bytes"`
 	Status     WorkerStatus   `gorm:"type:varchar(50);not null;default:'active'" json:"worker_status"`
 	CreatedAt  time.Time      `json:"worker_created_at"`
 	UpdatedAt  time.Time      `json:"worker_updated_at"`
