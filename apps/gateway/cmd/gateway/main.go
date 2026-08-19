@@ -34,7 +34,10 @@ func main() {
 	}
 
 	// Initialize the router
-	router := api.SetupRouter(db)
+	router, err := api.SetupRouter(db)
+	if err != nil {
+		log.Fatalf("Failed to initialize router: %v", err)
+	}
 
 	log.Println("Starting R10 Gateway on port 8080...")
 	if err := router.Run(":8080"); err != nil {

@@ -4,13 +4,19 @@ import (
 	"time"
 
 	"gateway/internal/controllers"
+	"gateway/internal/services"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func SetupRouter(db *gorm.DB) *gin.Engine {
+func SetupRouter(db *gorm.DB) (*gin.Engine, error) {
+	storage, err := services.NewStorageService(db)
+	if err != nil {
+		return nil, err
+	}
+
 	r := gin.Default()
 
 	// CORS config (allow frontend to connect)
@@ -18,7 +24,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		AllowOrigins:     []string{"http://localhost:4200"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Disposition"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -28,7 +34,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
-	fileCtrl := controllers.NewFileController(db)
+	fileCtrl := controllers.NewFileController(db, storage)
+	uploadCtrl := controllers.NewUploadController(db, storage)
 	mgtCtrl := controllers.NewManagementController(db)
 
 	v1 := r.Group("/api/v1")
@@ -36,14 +43,16 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		files := v1.Group("/files")
 		{
 			files.GET("", fileCtrl.ListFiles)
+			files.GET("/:blob_id", fileCtrl.GetFile)
+			files.GET("/:blob_id/download", fileCtrl.DownloadFile)
 			files.DELETE("/:blob_id", fileCtrl.DeleteFile)
 		}
 
 		uploads := v1.Group("/uploads")
 		{
-			uploads.POST("/init", controllers.InitUpload)
-			uploads.PUT("/:upload_id/parts/:part_number", controllers.UploadPart)
-			uploads.POST("/:upload_id/complete", controllers.CompleteUpload)
+			uploads.POST("/init", uploadCtrl.InitUpload)
+			uploads.PUT("/:upload_id/parts/:part_number", uploadCtrl.UploadPart)
+			uploads.POST("/:upload_id/complete", uploadCtrl.CompleteUpload)
 		}
 
 		management := v1.Group("/management")
@@ -56,5 +65,5 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		}
 	}
 
-	return r
+	return r, nil
 }
