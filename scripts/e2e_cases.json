@@ -1,0 +1,60 @@
+{
+  "_comment": [
+    "The e2e matrix: what must be true, separate from how it is checked.",
+    "'source' is a repo-relative file; 'generate' is a byte count filled with /dev/urandom.",
+    "'expect' is compared against facts read back from Postgres after the upload.",
+    "Every case additionally asserts the downloaded bytes are identical to the source.",
+    "Storage cases come from docs/erasure-coding.md: 1 = inline, 2 = whole block, 3 = 8+4 stripe."
+  ],
+  "cases": [
+    {
+      "name": "case1-tiny-inline",
+      "source": "data/totally_not_malware.js",
+      "why": "29B, far below the 128KB inline threshold",
+      "tags": ["default"],
+      "expect": { "storage_case": 1, "machine_types": ["inline"], "chunks": 1, "shards": [-1], "distinct_machines": 1, "blocks": 1 }
+    },
+    {
+      "name": "case1-inline-boundary",
+      "generate": 131071,
+      "why": "128KB minus one byte: the last size that still goes inline",
+      "tags": ["default", "boundary"],
+      "expect": { "storage_case": 1, "machine_types": ["inline"], "chunks": 1, "shards": [-1], "distinct_machines": 1, "blocks": 1 }
+    },
+    {
+      "name": "case2-block-boundary",
+      "generate": 131072,
+      "why": "exactly 128KB: the first size that becomes a whole block chunk",
+      "tags": ["default", "boundary"],
+      "expect": { "storage_case": 2, "machine_types": ["block"], "chunks": 1, "shards": [-1], "distinct_machines": 1, "blocks": 1 }
+    },
+    {
+      "name": "case2-real-image",
+      "source": "data/cat.jpg",
+      "why": "930KB, the ordinary mid-size path, no erasure coding",
+      "tags": ["default"],
+      "expect": { "storage_case": 2, "machine_types": ["block"], "chunks": 1, "shards": [-1], "distinct_machines": 1, "blocks": 1 }
+    },
+    {
+      "name": "case3-stripe-plus-tail",
+      "generate": 41943040,
+      "why": "40MB: one full 8+4 stripe plus an 8MB tail chunk",
+      "tags": ["default"],
+      "expect": { "storage_case": 3, "machine_types": ["block"], "chunks": 13, "shards": [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "distinct_machines": 12, "blocks": 2 }
+    },
+    {
+      "name": "case3-exact-block",
+      "generate": 33554432,
+      "why": "exactly 32MB. NOTE: docs/erasure-coding.md reads as Case 2 at this size, but a full block is a complete stripe and the code erasure-codes it. See docs/failure-catalog.md#boundary-32mb.",
+      "tags": ["full", "boundary"],
+      "expect": { "storage_case": 3, "machine_types": ["block"], "chunks": 12, "shards": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "distinct_machines": 12, "blocks": 1 }
+    },
+    {
+      "name": "case3-multi-stripe",
+      "generate": 71303168,
+      "why": "68MB: two full stripes plus a 4MB tail, proving block indexing across stripes",
+      "tags": ["full"],
+      "expect": { "storage_case": 3, "machine_types": ["block"], "chunks": 25, "shards": [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], "blocks": 3 }
+    }
+  ]
+}

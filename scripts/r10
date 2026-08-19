@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+# r10 -- single entrypoint for running and testing the R10 Blob Store locally.
+# Run `./scripts/r10 help` for the verb list.
+set -uo pipefail
+
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+source "$ROOT/scripts/lib/upload.sh"
+source "$ROOT/scripts/lib/cases.sh"
+source "$ROOT/scripts/lib/fault.sh"
+
+RESULTS_DIR="${RESULTS_DIR:-$LOG_DIR}"
+
+usage() {
+  cat <<'USAGE'
+r10 -- run and test the R10 Blob Store locally
+
+  preflight          Check the environment is sane and current. Run this first.
+  up                 Build and start 4 wkr10 daemons (8081-8084) and the gateway (8080)
+  down               Stop them
+  reset              Wipe and re-provision the cluster topology (destroys stored blobs)
+  migrate            Apply database migrations
+  test [--full]      Run the e2e matrix from scripts/e2e_cases.json
+                     default tag = the everyday set; --full adds the slow boundary cases
+  fault              Run fault injection against the erasure-coded read path
+  all                preflight -> test -> fault
+  explain <blob-id>  Show how one blob is physically stored, shard by shard
+  status             One-line cluster summary
+  help
+
+Environment: GATEWAY, CLUSTER_ROOT_DIR, LOG_DIR, PG_CONTAINER
+Results are written as JSON lines to $LOG_DIR/{matrix,fault}.jsonl
+USAGE
+}
+
+cmd_status() {
+  local workers machines blobs
+  workers=$(psql_q "select count(*) from infra.workers where deleted_at is null")
+  machines=$(psql_q "select count(*) from infra.machines where deleted_at is null")
+  blobs=$(psql_q "select count(*) from storage.blobs where deleted = false")
+  say "workers=${workers:-?} machines=${machines:-?} blobs=${blobs:-?} cluster_root=$CLUSTER_ROOT"
+}
+
+# preflight refuses to run tests against an environment that would produce
+# misleading results. The staleness check exists because a leftover `go run`
+# binary holding a port silently serves pre-fix code -- see
+# docs/failure-catalog.md#stale-process.
+cmd_preflight() {
+  local problems=0
+
+  head1 "database"
+  if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+    ok "container $PG_CONTAINER running"
+  else
+    err "container $PG_CONTAINER not running -- docker compose -f docker/docker-compose.yml up -d"
+    return 1
+  fi
+  if [ "$(psql_q 'select 1')" = "1" ]; then ok "accepting connections"; else
+    err "not accepting connections"; problems=$((problems+1)); fi
+  if [ -n "$(psql_q "select to_regclass('storage.blob_chunks')")" ]; then
+    ok "schema migrated"
+  else
+    err "schema missing -- ./scripts/r10 migrate"; problems=$((problems+1))
+  fi
+
+  head1 "processes"
+  local port exe expected
+  for port in 8080 "${WORKER_PORTS[@]}"; do
+    [ "$port" = "8080" ] && expected="$BIN_DIR/gateway" || expected="$BIN_DIR/wkr10"
+    exe="$(port_exe "$port")"
+    if [ -z "$exe" ]; then
+      err "port $port: nothing listening -- ./scripts/r10 up"
+      problems=$((problems+1))
+    elif [ "$exe" != "$(readlink -f "$expected" 2>/dev/null)" ]; then
+      err "port $port: held by an UNEXPECTED binary: $exe"
+      err "         this is the stale-process trap; it will serve old code silently."
+      err "         fix: kill $(port_pid "$port") && ./scripts/r10 up"
+      problems=$((problems+1))
+    elif ! curl -sf -m 3 "http://localhost:$port/ping" >/dev/null; then
+      err "port $port: binary correct but /ping failed"
+      problems=$((problems+1))
+    else
+      ok "port $port: $(basename "$exe") responding"
+    fi
+  done
+
+  head1 "build freshness"
+  local stale
+  for pair in "apps/gateway:$BIN_DIR/gateway" "apps/wkr10:$BIN_DIR/wkr10"; do
+    local srcdir="${pair%%:*}" bin="${pair##*:}"
+    if [ ! -x "$bin" ]; then
+      err "$(basename "$bin") not built -- ./scripts/r10 up"; problems=$((problems+1)); continue
+    fi
+    stale=$(find "$ROOT/$srcdir" -name '*.go' -newer "$bin" -print -quit 2>/dev/null)
+    if [ -n "$stale" ]; then
+      err "$(basename "$bin") is older than $srcdir sources (e.g. ${stale#$ROOT/}) -- ./scripts/r10 up"
+      problems=$((problems+1))
+    else
+      ok "$(basename "$bin") newer than its sources"
+    fi
+  done
+
+  head1 "cluster topology"
+  local workers machines
+  workers=$(psql_q "select count(*) from infra.workers where deleted_at is null")
+  machines=$(psql_q "select count(*) from infra.machines where deleted_at is null")
+  if [ "${workers:-0}" -eq "$EXPECTED_WORKERS" ] && [ "${machines:-0}" -eq "$EXPECTED_MACHINES" ]; then
+    ok "$workers workers / $machines machines provisioned"
+  else
+    err "expected $EXPECTED_WORKERS workers and $EXPECTED_MACHINES machines, found ${workers:-0}/${machines:-0} -- ./scripts/r10 reset"
+    problems=$((problems+1))
+  fi
+  if [ -z "$(psql_q "select 1 from infra.workers where address = '' or address is null limit 1")" ]; then
+    ok "every worker has an address"
+  else
+    err "some workers have no address -- ./scripts/r10 reset"; problems=$((problems+1))
+  fi
+
+  say ""
+  if [ "$problems" -eq 0 ]; then say "preflight: environment is sane and current"; return 0; fi
+  say "preflight: $problems problem(s) -- fix before trusting any test result"
+  return 1
+}
+
+cmd_up() {
+  mkdir -p "$LOG_DIR" "$CLUSTER_ROOT"
+  (cd "$ROOT/apps/wkr10" && go build -o "$BIN_DIR/wkr10" ./cmd/worker) || return 1
+  (cd "$ROOT/apps/gateway" && go build -o "$BIN_DIR/gateway" ./cmd/gateway) || return 1
+
+  cmd_down >/dev/null 2>&1; sleep 1
+
+  local i=1 port
+  for port in "${WORKER_PORTS[@]}"; do
+    PORT="$port" WORKER_NAME="wkr10_$i" CLUSTER_ROOT_DIR="$CLUSTER_ROOT" \
+      "$BIN_DIR/wkr10" >"$LOG_DIR/wkr10_$i.log" 2>&1 &
+    say "started wkr10_$i on $port (pid $!)"
+    i=$((i+1))
+  done
+  (cd "$ROOT/apps/gateway" && "$BIN_DIR/gateway" >"$LOG_DIR/gateway.log" 2>&1 &)
+  sleep 2
+  say "started gateway on 8080; logs in $LOG_DIR"
+}
+
+cmd_down() {
+  pkill -f "$BIN_DIR/wkr10" 2>/dev/null
+  pkill -f "$BIN_DIR/gateway" 2>/dev/null
+  say "stopped local cluster processes"
+  return 0
+}
+
+cmd_migrate() { (cd "$ROOT/apps/gateway" && go run ./scripts/bootstrap); }
+
+cmd_reset() {
+  local job status
+  job=$(curl -s -X POST "$GATEWAY/api/v1/management/reset" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("job_id",""))')
+  [ -z "$job" ] && { err "reset could not be started (is the gateway up?)"; return 1; }
+  sleep 2
+  job=$(curl -s -X POST "$GATEWAY/api/v1/management/bootstrap" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("job_id",""))')
+  sleep 3
+  status=$(curl -s "$GATEWAY/api/v1/management/jobs/$job" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d["job_status"], d.get("job_error",""))')
+  say "bootstrap: $status"
+  [[ "$status" == success* ]]
+}
+
+cmd_test() {
+  local tag=default
+  [ "${1:-}" = "--full" ] && tag=full
+  mkdir -p "$RESULTS_DIR"
+  run_cases "$tag" "$RESULTS_DIR/matrix.jsonl"
+  local rc=$?
+  say "results: $RESULTS_DIR/matrix.jsonl"
+  return $rc
+}
+
+cmd_fault() {
+  mkdir -p "$RESULTS_DIR"
+  run_fault_suite "$RESULTS_DIR/fault.jsonl"
+  local rc=$?
+  say "results: $RESULTS_DIR/fault.jsonl"
+  return $rc
+}
+
+cmd_explain() {
+  local blob="${1:-}"
+  [ -z "$blob" ] && { err "usage: r10 explain <blob-id>"; return 1; }
+  curl -s "$GATEWAY/api/v1/files/$blob" | python3 "$ROOT/scripts/lib/explain.py" || return 1
+  say ""
+  say "on-disk presence:"
+  psql_q "select m.name || '/' || c.physical_path, c.shard_index
+          from storage.blob_chunks c
+          join infra.discs d on d.id = c.disc_id
+          join infra.machines m on m.id = d.machine_id
+          where c.blob_id = '$blob' order by c.block_index, c.shard_index;" |
+  while IFS='|' read -r rel shard; do
+    [ -z "$rel" ] && continue
+    if [ -f "$CLUSTER_ROOT/$rel" ]; then ok "shard $shard present  $rel"; else err "shard $shard MISSING  $rel"; fi
+  done
+}
+
+case "${1:-help}" in
+  preflight) shift; cmd_preflight "$@" ;;
+  up)        shift; cmd_up "$@" ;;
+  down)      shift; cmd_down "$@" ;;
+  reset)     shift; cmd_reset "$@" ;;
+  migrate)   shift; cmd_migrate "$@" ;;
+  test)      shift; cmd_test "$@" ;;
+  fault)     shift; cmd_fault "$@" ;;
+  status)    shift; cmd_status "$@" ;;
+  explain)   shift; cmd_explain "$@" ;;
+  all)       cmd_preflight && cmd_test && cmd_fault ;;
+  help|-h|--help) usage ;;
+  *)         err "unknown verb: $1"; say ""; usage; exit 1 ;;
+esac
