@@ -56,7 +56,7 @@ import { ManagementService, ClusterStats } from '../../../core/services/manageme
               <td>{{ formatSize(file.blob_size) }}</td>
               <td>{{ formatDate(file.blob_created_at) }}</td>
               <td class="actions-col">
-                <button class="btn-icon" title="Baixar arquivo (Em breve)" (click)="downloadFile(file)">
+                <button class="btn-icon" title="Baixar arquivo" (click)="downloadFile(file)">
                   <i class="ph ph-download-simple"></i>
                 </button>
                 <button class="btn-icon danger" title="Deletar arquivo" (click)="deleteFile(file)">
@@ -159,7 +159,20 @@ export class FileListComponent implements OnInit {
   }
 
   downloadFile(file: BlobFile) {
-    alert(`O download do arquivo "${file.blob_filename}" será habilitado na próxima etapa do debug de I/O.`);
+    this.fileService.downloadFile(file.blob_uuid).subscribe({
+      next: (payload) => {
+        // Hand the reassembled bytes to the browser via a temporary object URL.
+        const url = URL.createObjectURL(payload);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.blob_filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (err) => {
+        alert(`Falha ao baixar "${file.blob_filename}": ${err?.error?.error ?? err.message}`);
+      }
+    });
   }
 
   deleteFile(file: BlobFile) {

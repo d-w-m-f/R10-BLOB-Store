@@ -28,6 +28,15 @@ export class FileService {
     return this.http.delete(`${this.apiUrl}/${blobUuid}`);
   }
 
+  /**
+   * Pulls a blob back out of the cluster. The gateway reassembles it from its
+   * chunks (reconstructing missing Reed-Solomon shards when needed) and streams
+   * the original bytes, so the browser only ever sees a plain binary response.
+   */
+  downloadFile(blobUuid: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${blobUuid}/download`, { responseType: 'blob' });
+  }
+
   formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B';
     const k = 1024;
