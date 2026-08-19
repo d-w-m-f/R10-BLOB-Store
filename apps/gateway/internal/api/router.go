@@ -28,11 +28,15 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		c.JSON(200, gin.H{"message": "pong"})
 	})
 
+	fileCtrl := controllers.NewFileController(db)
+	mgtCtrl := controllers.NewManagementController(db)
+
 	v1 := r.Group("/api/v1")
 	{
 		files := v1.Group("/files")
 		{
-			files.DELETE("/:blob_id", controllers.DeleteFile)
+			files.GET("", fileCtrl.ListFiles)
+			files.DELETE("/:blob_id", fileCtrl.DeleteFile)
 		}
 
 		uploads := v1.Group("/uploads")
@@ -42,7 +46,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			uploads.POST("/:upload_id/complete", controllers.CompleteUpload)
 		}
 
-		mgtCtrl := controllers.NewManagementController(db)
 		management := v1.Group("/management")
 		{
 			management.GET("/cluster", mgtCtrl.GetClusterStats)
