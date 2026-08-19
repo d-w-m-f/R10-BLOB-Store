@@ -51,6 +51,7 @@ func main() {
 	{
 		v1.POST("/machines/:machine_namespace/chunks", chunkHandler.WriteBlockChunk)
 		v1.POST("/machines/:machine_namespace/append", chunkHandler.AppendInlineChunk)
+		v1.GET("/machines/:machine_namespace/chunks", chunkHandler.ReadChunk)
 	}
 
 	if err := r.Run(":" + port); err != nil {

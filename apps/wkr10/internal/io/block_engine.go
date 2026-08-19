@@ -59,24 +59,31 @@ func (e *BlockEngine) Read(machineNamespace string, physicalPath string, physica
 	return data[:n], nil
 }
 
-func (e *BlockEngine) StreamWrite(machineNamespace string, chunkID string, reader io.Reader, size int64) (string, int64, error) {
+func (e *BlockEngine) StreamWrite(machineNamespace string, chunkID string, reader io.Reader, size int64) (string, int64, int64, error) {
 	machineDir := e.getMachineDir(machineNamespace)
 	relPath := fmt.Sprintf("chunks/%s.dat", chunkID)
 	absPath := filepath.Join(machineDir, relPath)
 
 	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
-		return "", 0, fmt.Errorf("failed to create chunks dir: %w", err)
+		return "", 0, 0, fmt.Errorf("failed to create chunks dir: %w", err)
 	}
 
 	file, err := os.OpenFile(absPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to open chunk file for streaming: %w", err)
+		return "", 0, 0, fmt.Errorf("failed to open chunk file for streaming: %w", err)
 	}
 	defer file.Close()
 
-	if _, err := io.Copy(file, reader); err != nil {
-		return "", 0, fmt.Errorf("failed to stream write chunk: %w", err)
+	written, err := io.Copy(file, reader)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("failed to stream write chunk: %w", err)
 	}
 
-	return relPath, 0, nil
+	// Durability: the gateway records this location in Postgres as soon as we answer,
+	// so the bytes must be on the platter before the response goes out.
+	if err := file.Sync(); err != nil {
+		return "", 0, 0, fmt.Errorf("failed to sync chunk file: %w", err)
+	}
+
+	return relPath, 0, written, nil
 }
