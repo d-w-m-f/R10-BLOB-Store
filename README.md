@@ -25,80 +25,67 @@ Certifique-se de possuir os seguintes ambientes e binários instalados no seu si
 
 ## Setup & Execução
 
-### 1. Banco de Dados (Docker Compose)
+O que precisa estar no ar:
+
+| Componente | Porta | Como sobe |
+| --- | --- | --- |
+| PostgreSQL | 5432 | `docker compose` (ciclo de vida próprio) |
+| Gateway | 8080 | `./scripts/r10 up` |
+| 4 daemons wkr10 | 8081-8084 | `./scripts/r10 up` |
+| Frontend Angular | 4200 | `pnpm start` (opcional; o e2e não usa) |
+
+São **4 daemons**, não um: a topologia (`services.ClusterTopology`) define 3 workers de
+bloco e 1 inline, e o placement precisa de 12 máquinas distintas para um stripe 8+4.
+Com um worker só, todo upload com Erasure Coding falha.
+
+### Subida normal (mantém o que já está armazenado)
 
 ```bash
-# Start PostgreSQL container in background
 docker compose -f docker/docker-compose.yml up -d
-
-# Verify container health and exposure on port 5432
-docker compose -f docker/docker-compose.yml ps
+./scripts/r10 up
+./scripts/r10 preflight
 ```
 
-### 2. Gateway API & Orquestrador
+### Subida limpa (APAGA todos os blobs armazenados)
 
 ```bash
-# Enter gateway application workspace
-cd apps/gateway
-
-# Download and resolve Go module dependencies
-go mod tidy
-
-# Execute database migrations and register schema models
-go run ./scripts/bootstrap
-
-# Start REST gateway server on port 8080
-go run ./cmd/gateway
+docker compose -f docker/docker-compose.yml up -d
+./scripts/r10 up
+./scripts/r10 migrate     # só é necessário após mudança de schema; inofensivo no resto
+./scripts/r10 reset       # destrói os blobs e re-provisiona 4 workers / 38 máquinas
+./scripts/r10 preflight
 ```
 
-### 3. Workers Multiplexados (wkr10)
+**A ordem importa num ponto:** o Postgres precisa estar no ar antes do `r10 up`, porque o
+gateway encerra na hora se não conseguir conectar. Se o gateway aparecer faltando no
+preflight, quase sempre é isso -- confira `/tmp/r10_logs/gateway.log`.
 
-O cluster simulado roda **4 daemons** (3 de bloco + 1 inline), um por porta, conforme
-`services.ClusterTopology` no Gateway. Cada daemon multiplexa dezenas de máquinas lógicas.
+Na dúvida, rode só `./scripts/r10 preflight`: ele diz exatamente o que está errado e traz
+o comando de correção na própria mensagem de falha.
+
+`r10 up` compila os dois binários, derruba o que estiver rodando (é seguro repetir), sobe
+os 5 processos em background e joga os logs em `/tmp/r10_logs/`. O terminal fica livre.
+`./scripts/r10 down` derruba tudo.
+
+### Rodando um serviço isolado (debug)
+
+Útil para acompanhar o log de um processo em foreground:
 
 ```bash
-cd apps/wkr10
-go mod tidy
-
-# Um terminal por daemon (PORT e WORKER_NAME sobrescrevem o .env)
-PORT=8081 WORKER_NAME=wkr10_1 go run ./cmd/worker   # block
-PORT=8082 WORKER_NAME=wkr10_2 go run ./cmd/worker   # block
-PORT=8083 WORKER_NAME=wkr10_3 go run ./cmd/worker   # block
-PORT=8084 WORKER_NAME=wkr10_4 go run ./cmd/worker   # inline
+cd apps/gateway && go run ./cmd/gateway                    # gateway
+cd apps/wkr10 && PORT=8082 WORKER_NAME=wkr10_2 go run ./cmd/worker   # um daemon
 ```
 
-Ou suba tudo (4 workers + gateway) de uma vez, com logs em `/tmp/r10_logs`:
+`PORT` e `WORKER_NAME` sobrescrevem o `.env` (godotenv nunca sobrescreve variável já
+definida). As portas precisam bater com `services.ClusterTopology`.
+
+### Frontend SPA (Control Plane)
 
 ```bash
-./scripts/r10 up      # subir
-./scripts/r10 down    # derrubar
-```
-
-### 3.1. Provisionar o cluster
-
-Antes do primeiro upload é preciso criar os workers, as máquinas lógicas e os discos:
-
-```bash
-# Via Control Plane (assíncrono, retorna job_id)
-curl -X POST http://localhost:8080/api/v1/management/bootstrap
-
-# Ou via CLI (síncrono)
-cd apps/gateway && go run ./scripts/setup_cluster
-```
-
-### 4. Frontend SPA (Control Plane)
-
-```bash
-# Open a new terminal session and enter web application workspace
 cd apps/web
-
-# Install frontend UI dependencies via PNPM
 pnpm install
-
-# Launch Angular dev server and interface at http://localhost:4200
-pnpm run start
+pnpm run start     # http://localhost:4200
 ```
-
 
 ---
 
