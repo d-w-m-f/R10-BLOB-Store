@@ -78,7 +78,7 @@ func (e *InlineEngine) Read(machineNamespace string, physicalPath string, physic
 	return data[:n], nil
 }
 
-func (e *InlineEngine) StreamWrite(machineNamespace string, chunkID string, reader io.Reader, size int64) (string, int64, error) {
+func (e *InlineEngine) StreamWrite(machineNamespace string, chunkID string, reader io.Reader, size int64) (string, int64, int64, error) {
 	mu := e.getMutex(machineNamespace)
 	mu.Lock()
 	defer mu.Unlock()
@@ -88,25 +88,30 @@ func (e *InlineEngine) StreamWrite(machineNamespace string, chunkID string, read
 	absPath := filepath.Join(machineDir, relPath)
 
 	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
-		return "", 0, fmt.Errorf("failed to create volume dir: %w", err)
+		return "", 0, 0, fmt.Errorf("failed to create volume dir: %w", err)
 	}
 
 	file, err := os.OpenFile(absPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to open volume file for streaming: %w", err)
+		return "", 0, 0, fmt.Errorf("failed to open volume file for streaming: %w", err)
 	}
 	defer file.Close()
 
 	stat, err := file.Stat()
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to stat volume file: %w", err)
+		return "", 0, 0, fmt.Errorf("failed to stat volume file: %w", err)
 	}
-	
+
 	offset := stat.Size()
 
-	if _, err := io.Copy(file, reader); err != nil {
-		return "", 0, fmt.Errorf("failed to stream to volume file: %w", err)
+	written, err := io.Copy(file, reader)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("failed to stream to volume file: %w", err)
 	}
 
-	return relPath, offset, nil
+	if err := file.Sync(); err != nil {
+		return "", 0, 0, fmt.Errorf("failed to sync volume file: %w", err)
+	}
+
+	return relPath, offset, written, nil
 }
